@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: safe_solutions_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: safe_secure_postgres_pass_2026
+      POSTGRES_DB: safe_solutions_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d safe_solutions_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: safe_solutions_backend
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      API_PREFIX: /api/v1
+      DATABASE_URL: postgresql://postgres:safe_secure_postgres_pass_2026@postgres:5432/safe_solutions_db?schema=public
+      JWT_SECRET: safe_solutions_enterprise_jwt_super_secret_key_2026_change_in_prod
+      JWT_EXPIRES_IN: 7d
+      UPLOAD_PATH: /app/uploads
+      MAX_FILE_SIZE_MB: 15
+      CORS_ORIGIN: http://localhost:3000,http://localhost:5000
+    volumes:
+      - backend_uploads:/app/uploads
+
+volumes:
+  postgres_data:
+  backend_uploads:

@@ -1,0 +1,329 @@
+# SAFE SOLUTIONS — FLEET & SMART ATTENDANCE SYSTEM
+## Database Architecture & Schema Specification
+
+### 1. Database Engine & ORM
+- **Engine**: PostgreSQL 15+ (Local instance `postgresql-x64-17`)
+- **ORM**: Prisma ORM with strict type-safety, automated migrations, and seed scripts.
+
+---
+
+### 2. Entities & Schema Definition
+
+```prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  BOSS
+  CONTROLLER
+  MANAGER
+  EMPLOYEE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum VehicleType {
+  BIKE
+  CAR
+  UNSPECIFIED
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  TERMINATED
+}
+
+enum AttendanceType {
+  OFFICE_CHECK_IN
+  OFFICE_CHECK_OUT
+  VEHICLE_CHECK_IN
+  SITE_CHECK_IN
+}
+
+enum ApprovalStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum FuelType {
+  PETROL
+  DIESEL
+  HI_OCTANE
+}
+
+enum MaintenanceType {
+  ROUTINE_SERVICE
+  OIL_CHANGE
+  TYRE
+  BATTERY
+  REPAIR
+  ACCIDENT_DAMAGE
+  OTHER
+}
+
+enum MaintenanceStatus {
+  PENDING
+  COMPLETED
+  OVERDUE
+}
+
+model User {
+  id                  String       @id @default(uuid())
+  email               String       @unique
+  passwordHash        String       @map("password_hash")
+  role                Role         @default(EMPLOYEE)
+  status              UserStatus   @default(ACTIVE)
+  mustChangePassword  Boolean      @default(true) @map("must_change_password")
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+
+  employee            Employee?
+  approvedAttendances Attendance[] @relation("ApprovedAttendances")
+  assignedVehicles    VehicleAssignment[] @relation("AssignedByUsers")
+  createdFuelRecords  FuelRecord[] @relation("CreatedFuelRecords")
+  createdMaintenances MaintenanceRecord[] @relation("CreatedMaintenances")
+  auditLogs           AuditLog[]
+  notifications       Notification[]
+
+  @@map("users")
+}
+
+model Employee {
+  id               String       @id @default(uuid())
+  userId           String       @unique @map("user_id")
+  employeeCode     String       @unique @map("employee_code")
+  name             String
+  phone            String       @unique
+  personalEmail    String       @map("personal_email")
+  department       String
+  designation      String
+  conveyanceType   String       @map("conveyance_type") // Bike, Car, None, Unspecified
+  joiningDate      DateTime?    @map("joining_date")
+  status           UserStatus   @default(ACTIVE)
+  profilePhotoUrl  String?      @map("profile_photo_url")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assignments      VehicleAssignment[]
+  attendances      Attendance[]
+  fuelRecords      FuelRecord[]
+
+  @@map("employees")
+}
+
+model Vehicle {
+  id                  String          @id @default(uuid())
+  vehicleCode         String          @unique @map("vehicle_code")
+  registrationNumber  String          @unique @map("registration_number")
+  vehicleType         VehicleType     @default(UNSPECIFIED) @map("vehicle_type")
+  make                String?
+  model               String?
+  color               String?
+  initialOdometer     Int             @default(0) @map("initial_odometer")
+  currentOdometer     Int             @default(0) @map("current_odometer")
+  status              VehicleStatus   @default(ACTIVE)
+  qrCodeIdentifier    String          @unique @map("qr_code_identifier")
+  notes               String?
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
+
+  assignments         VehicleAssignment[]
+  attendances         Attendance[]
+  fuelRecords         FuelRecord[]
+  maintenanceRecords  MaintenanceRecord[]
+
+  @@map("vehicles")
+}
+
+model VehicleAssignment {
+  id           String           @id @default(uuid())
+  vehicleId    String           @map("vehicle_id")
+  employeeId   String           @map("employee_id")
+  assignedById String           @map("assigned_by_id")
+  assignedAt   DateTime         @default(now()) @map("assigned_at")
+  unassignedAt DateTime?        @map("unassigned_at")
+  status       AssignmentStatus @default(ACTIVE)
+  notes        String?
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  vehicle      Vehicle          @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  employee     Employee         @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  assignedBy   User             @relation("AssignedByUsers", fields: [assignedById], references: [id])
+
+  @@map("vehicle_assignments")
+}
+
+model OfficeLocation {
+  id                 String       @id @default(uuid())
+  name               String
+  address            String
+  latitude           Float
+  longitude          Float
+  allowedRadiusMeters Float       @default(150) @map("allowed_radius_meters")
+  qrCodeIdentifier   String       @unique @map("qr_code_identifier")
+  isActive           Boolean      @default(true) @map("is_active")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
+
+  attendances        Attendance[]
+
+  @@map("office_locations")
+}
+
+model SiteRegistry {
+  id            String       @id @default(uuid())
+  name          String
+  clientName    String?      @map("client_name")
+  projectName   String?      @map("project_name")
+  address       String?
+  latitude      Float?
+  longitude     Float?
+  radiusMeters  Float?       @default(300) @map("radius_meters")
+  isActive      Boolean      @default(true) @map("is_active")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  attendances   Attendance[]
+
+  @@map("site_registries")
+}
+
+model Attendance {
+  id                        String         @id @default(uuid())
+  employeeId                String         @map("employee_id")
+  attendanceType            AttendanceType @map("attendance_type")
+  vehicleId                 String?        @map("vehicle_id")
+  officeId                  String?        @map("office_id")
+  siteId                    String?        @map("site_id")
+  date                      DateTime       @db.Date
+  checkInTime               DateTime       @map("check_in_time")
+  checkOutTime              DateTime?      @map("check_out_time")
+  originalCheckInTime       DateTime       @map("original_check_in_time")
+  originalCheckOutTime      DateTime?      @map("original_check_out_time")
+  approvalStatus            ApprovalStatus @default(PENDING_APPROVAL) @map("approval_status")
+  approvedById              String?        @map("approved_by_id")
+  approvedAt                DateTime?      @map("approved_at")
+  rejectionReason           String?        @map("rejection_reason")
+  managerRemarks            String?        @map("manager_remarks")
+  latitude                  Float
+  longitude                 Float
+  gpsAccuracy               Float?         @map("gps_accuracy")
+  locationAddress           String?        @map("location_address")
+  distanceFromTargetMeters  Float?         @map("distance_from_target_meters")
+  isGeofenceViolation       Boolean        @default(false) @map("is_geofence_violation")
+  selfieUrl                 String         @map("selfie_url")
+  meterPhotoUrl             String?        @map("meter_photo_url")
+  sitePhotoUrl              String?        @map("site_photo_url")
+  odometerReading           Int?           @map("odometer_reading")
+  ocrRawResult              String?        @map("ocr_raw_result")
+  ocrConfidence             Float?         @map("ocr_confidence")
+  idempotencyKey            String?        @unique @map("idempotency_key")
+  createdAt                 DateTime       @default(now()) @map("created_at")
+  updatedAt                 DateTime       @updatedAt @map("updated_at")
+
+  employee                  Employee       @relation(fields: [employeeId], references: [id])
+  vehicle                   Vehicle?       @relation(fields: [vehicleId], references: [id])
+  office                    OfficeLocation? @relation(fields: [officeId], references: [id])
+  site                      SiteRegistry?  @relation(fields: [siteId], references: [id])
+  approvedBy                User?          @relation("ApprovedAttendances", fields: [approvedById], references: [id])
+
+  @@map("attendances")
+}
+
+model FuelRecord {
+  id              String       @id @default(uuid())
+  vehicleId       String       @map("vehicle_id")
+  employeeId      String       @map("employee_id")
+  date            DateTime     @default(now())
+  fuelType        FuelType     @default(PETROL) @map("fuel_type")
+  liters          Float
+  amount          Float
+  odometerReading Int          @map("odometer_reading")
+  receiptPhotoUrl String?      @map("receipt_photo_url")
+  fuelStation     String?      @map("fuel_station")
+  notes           String?
+  createdById     String       @map("created_by_id")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  vehicle         Vehicle      @relation(fields: [vehicleId], references: [id])
+  employee        Employee     @relation(fields: [employeeId], references: [id])
+  createdBy       User         @relation("CreatedFuelRecords", fields: [createdById], references: [id])
+
+  @@map("fuel_records")
+}
+
+model MaintenanceRecord {
+  id                  String            @id @default(uuid())
+  vehicleId           String            @map("vehicle_id")
+  maintenanceType     MaintenanceType   @map("maintenance_type")
+  serviceDate         DateTime          @map("service_date")
+  odometerReading     Int               @map("odometer_reading")
+  cost                Float
+  vendorName          String?           @map("vendor_name")
+  description         String
+  invoicePhotoUrl     String?           @map("invoice_photo_url")
+  nextServiceDate     DateTime?         @map("next_service_date")
+  nextServiceOdometer Int?              @map("next_service_odometer")
+  status              MaintenanceStatus @default(COMPLETED)
+  createdById         String            @map("created_by_id")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+
+  vehicle             Vehicle           @relation(fields: [vehicleId], references: [id])
+  createdBy           User              @relation("CreatedMaintenances", fields: [createdById], references: [id])
+
+  @@map("maintenance_records")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  actorId     String?  @map("actor_id")
+  action      String
+  entityName  String   @map("entity_name")
+  entityId    String   @map("entity_id")
+  oldValue    Json?    @map("old_value")
+  newValue    Json?    @map("new_value")
+  ipAddress   String?  @map("ip_address")
+  userAgent   String?  @map("user_agent")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  actor       User?    @relation(fields: [actorId], references: [id])
+
+  @@map("audit_logs")
+}
+
+model Notification {
+  id          String   @id @default(uuid())
+  recipientId String   @map("recipient_id")
+  type        String
+  title       String
+  message     String
+  entityName  String?  @map("entity_name")
+  entityId    String?  @map("entity_id")
+  isRead      Boolean  @default(false) @map("is_read")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  recipient   User     @relation(fields: [recipientId], references: [id])
+
+  @@map("notifications")
+}
+```
