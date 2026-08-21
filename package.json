@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "postinstall": "npx prisma generate --schema=backend/prisma/schema.prisma",
     "build": "npx prisma generate --schema=backend/prisma/schema.prisma && npx tsc -p backend/tsconfig.json",
     "vercel-build": "npx prisma generate --schema=backend/prisma/schema.prisma && npx tsc -p backend/tsconfig.json"
   },
