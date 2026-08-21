@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "postinstall": "prisma generate --schema=backend/prisma/schema.prisma",
-    "build": "prisma generate --schema=backend/prisma/schema.prisma && tsc -p backend/tsconfig.json",
-    "vercel-build": "prisma generate --schema=backend/prisma/schema.prisma && tsc -p backend/tsconfig.json"
+    "postinstall": "npx prisma generate --schema=backend/prisma/schema.prisma",
+    "build": "npx prisma generate --schema=backend/prisma/schema.prisma && npx tsc -p backend/tsconfig.json",
+    "vercel-build": "npx prisma generate --schema=backend/prisma/schema.prisma && npx tsc -p backend/tsconfig.json"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0"

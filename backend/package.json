@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node ./node_modules/tsx/dist/cli.mjs watch src/server.ts",
     "build": "node ./node_modules/typescript/bin/tsc",
+    "postinstall": "prisma generate",
     "start": "node dist/server.js",
     "prisma:generate": "node ./node_modules/prisma/build/index.js generate",
     "prisma:push": "node ./node_modules/prisma/build/index.js db push",
@@ -33,6 +34,7 @@
     "@types/multer": "^1.4.12",
     "@types/node": "^20.16.5",
     "@types/uuid": "^10.0.0",
+    "@vercel/node": "^3.2.33",
     "prisma": "^5.22.0",
     "tsx": "^4.19.1",
     "typescript": "^5.5.4"
